@@ -57,19 +57,6 @@ __inline int _msb_u64(size_t* bn, int length) {
 	return p < 0 ? 0 : ((p) << 6) + (63 - (count % 64));
 }
 
-__inline int compare(size_t* a, size_t* b, int bits) {
-	int rbits = bits % 64;
-	int nbits = bits / 64;
-	nbits += (rbits == 0 ? 0 : 1);
-	//high to low compare
-	for (int i = nbits; i >= 0; i--) {
-		size_t ax = (i == nbits) ? a[i] & ((~0) >> (64 - rbits)) : a[i];
-		size_t bx = (i == nbits) ? b[i] & ((~0) >> (64 - rbits)) : b[i];
-		if (ax == bx) continue;
-		return (ax > bx) ? 1 : -1;
-	}
-	return 0;
-}
 __inline void sub_core(size_t* result, size_t* a, size_t* b, int nbits) {
 	//a-b
 	size_t borrow = all_zeros;
@@ -159,10 +146,10 @@ __inline size_t max(size_t a, size_t b) {
 	return a >= b ? a : b;
 }
 __inline int clearbits(size_t* dst, int length) {
-	if (dst != 0 && length>=0) {
+	if (dst != 0 && length >= 0) {
 		int ps = length >> 6;
 		int rs = length % 64;
-		memset(dst, 0, ps*sizeof(size_t));
+		memset(dst, 0, ps * sizeof(size_t));
 		if (rs != 0)
 			dst[ps] &= ~(all_ones << rs);
 		return length;
@@ -194,6 +181,7 @@ __inline int sub_core_shift_bits(size_t* result, size_t* a, size_t* b, int rbits
 	//
 	size_t rx = all_zeros;
 	copybits(result, a, delta);
+	bool any = false;
 	for (int i = 0; i < bbits; i += 64) {
 		size_t ax = get_bits(a, abits, i + delta);
 		size_t bx = get_bits(b, bbits, i);
@@ -217,34 +205,10 @@ __inline int sub_core_shift_bits(size_t* result, size_t* a, size_t* b, int rbits
 			borrow = all_zeros;
 			++borrow;
 		}
+		any |= rx != 0;
 		set_bits(result, rbits, i + delta, rx);
 	}
-	printf("result:\n");
-	printbin(result, rbits >> 6);
-	printf("\n");
-	return delta;
-}
-
-__inline int sub_with_equal_bits(size_t* result, size_t* a, size_t* b, int bits) {
-	int rbits = bits % 64;
-	int nbits = bits >> 6;
-	nbits += (rbits == 0) ? 0 : 1;
-	//a>=b
-	int cmp = compare(a, b, bits);
-	if (cmp == 0)
-	{
-		memset(result, 0, nbits * sizeof(size_t));
-		return 0;
-	}
-	else if (cmp > 0) //a>b
-	{
-		sub_core(result, a, b, nbits);
-		return cmp;
-	}
-	else { //a<b,copy a to result
-		memcpy(result, a, nbits * sizeof(size_t));
-		return -1;
-	}
+	return delta == 0 ? (any ? -1 : 0) : delta;
 }
 
 //br: result 
@@ -252,34 +216,23 @@ __inline int max_sub(size_t* result, size_t* a, size_t* b, int a_length, int b_l
 	int abits = _msb_u64(a, a_length);
 	int bbits = _msb_u64(b, b_length);
 	int delta = abits - bbits;
-
-	return
-		delta < 0
-		? delta
-		: delta == 0
-		? sub_with_equal_bits(result, a, b, abits)
-		: sub_core_shift_bits(result, a, b, (a_length << 6), abits, bbits)
-		;
-}
-void swap(size_t* a, size_t* b, int length) {
-	for (int i = 0; i < length; i++) {
-		size_t v = a[i];
-		a[i] = b[i];
-		b[i] = v;
+	if (delta < 0) {
+		return delta;
+	}
+	else { //delta <= 0
+		return sub_core_shift_bits(result, a, b, (a_length << 6), abits, bbits);
 	}
 }
 int fast_mod(size_t* result, size_t* minuend, size_t* subtrahend, int minuend_length, int subtrahend_length) {
 	int cmp = 1;
-	int flip = 0;
-	memcpy(result, minuend, (size_t)minuend_length << 3);
-	while (cmp > 0)
+	//memcpy(result, minuend, (size_t)minuend_length << 3);
+	while (true)
 	{
 		cmp = max_sub(result, minuend, subtrahend, minuend_length, subtrahend_length);
-
+		if (cmp <= 0) break;
 		memcpy(minuend, result, (size_t)minuend_length << 3);
-
-		memset(result, 0, (size_t)minuend_length << 3);
 	}
+
 	return cmp;
 }
 int subrange_sample() {
@@ -308,7 +261,7 @@ int subrange_sample() {
 	return 0;
 }
 int fastmod_sample() {
-	const int a_length = 128 / 64; //32
+	const int a_length = 2048 / 64; //32
 	const int b_length = a_length >> 1;
 
 	size_t result[a_length] = { 0 };
@@ -317,9 +270,9 @@ int fastmod_sample() {
 
 	generate(a, a_length);
 	generate(b, b_length);
-	a[1] = 0b0000000011100011100101110110100001100001101001001010110000101000;
-	a[0] = 0b0110110001101111110100100100000110011011110010110000000100110010;
-	b[0] = 0b0000000000000000001010001111010110010011110111111100110011011101;
+	//a[1] = 0b0000000011100011100101110110100001100001101001001010110000101000;
+	//a[0] = 0b0110110001101111110100100100000110011011110010110000000100110010;
+	//b[0] = 0b0000000000000000001010001111010110010011110111111100110011011101;
 
 	printf("a:%d\n", _msb_u64(a, a_length));
 	printbin(a, a_length);
@@ -328,15 +281,25 @@ int fastmod_sample() {
 	printbin(b, b_length);
 	printf("\n");
 
-	int f = fast_mod(result, a, b, a_length, b_length);
-	if (f == 0) {
-		printf("a is n tims of b\n");
+	int r = fast_mod(result, a, b, a_length, b_length);
+	if (r == 0) {
+		printf("a %% b =\n");
+		printbin(result, a_length);
+		printf("\n");
+	}
+	else {
+		printf("a %% b = ");
+		printbin(result, a_length);
+		printf("\n    b = ");
+		for (int i = 0; i < b_length<<6; i++) printf("0");
+		printbin(b, b_length);
+		printf("\n");
 	}
 	return 0;
 }
 int main()
 {
-	subrange_sample();
+	//subrange_sample();
 	fastmod_sample();
 	return 0;
 }
