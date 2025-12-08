@@ -1,7 +1,4 @@
-﻿// FAST_MOD.cpp : 此文件包含 "main" 函数。程序执行将在此处开始并结束。
-//
-
-#include <iostream>
+﻿#include <iostream>
 #include <intrin.h>
 
 const size_t all_zeros = 0ULL;
@@ -35,24 +32,24 @@ __inline void printhex(size_t* value, int length) {
 	}
 }
 
-__inline size_t* generate(size_t* bn, int length) {
+__inline size_t* generate(size_t* n, int length) {
 	size_t v = 0;
 	int p = 0;
 	while (p < length) {
 		_rdrand64_step(&v);
-		bn[p++] = v;
+		n[p++] = v;
 	}
-	return bn;
+	return n;
 }
 __inline int _msb_u64(size_t n) {
 	return 64 - (int)_lzcnt_u64(n);
 }
-__inline int _msb_u64(size_t* bn, int length) {
+__inline int _msb_u64(size_t* n, int length) {
 	if (length == 0) return all_zeros;
 	int count = 64;
 	int p = length;
 	while (count == 64 && --p >= 0) {
-		count = (int)_lzcnt_u64(bn[p]);
+		count = (int)_lzcnt_u64(n[p]);
 	}
 	return p < 0 ? 0 : ((p) << 6) + (63 - (count % 64));
 }
@@ -83,12 +80,12 @@ __inline void sub_core(size_t* result, size_t* a, size_t* b, int nbits) {
 	}
 
 }
-__inline size_t get_bits(size_t* a, int max_pos, int basepos, int length = 64) {
-	if (basepos > max_pos)
+__inline size_t get_bits(size_t* a, int maxpos, int basepos, int length = 64) {
+	if (basepos > maxpos)
 		basepos = 64 - basepos;
 	int drem = basepos % 64;
 	int dcount = (basepos >> 6);
-	int exceeding = max_pos - (basepos + 64);
+	int exceeding = maxpos - (basepos + 64);
 	size_t value =
 		drem == 0
 		? (a[dcount + 0])
@@ -104,10 +101,10 @@ __inline size_t get_bits(size_t* a, int max_pos, int basepos, int length = 64) {
 	length = length > 64 ? 64 : length;
 	return length == 64 ? value : value & ~(all_ones << length);
 }
-__inline size_t set_bits(size_t* a, int maxpos, int bp, size_t value, int length = 64) {
-	int drem = bp % 64;
-	int dcount = (bp >> 6);
-	int exceeding = maxpos - (bp + 64);
+__inline size_t set_bits(size_t* a, int maxpos, int basepos, size_t value, int length = 64) {
+	int drem = basepos % 64;
+	int dcount = (basepos >> 6);
+	int exceeding = maxpos - (basepos + 64);
 	int ecount = 0;
 	int erem = 0;
 	if (exceeding < 0) {
@@ -139,7 +136,6 @@ __inline size_t set_bits(size_t* a, int maxpos, int bp, size_t value, int length
 	}
 	return value;
 }
-
 __inline int copybits(void* dst, void* src, int length) {
 	if (dst != 0 && src != 0) {
 		int rs = length % 64;
@@ -193,7 +189,6 @@ __inline int sub_core_shift_bits(size_t* result, size_t* a, size_t* b, int rbits
 	}
 	return delta == 0 ? (any ? -1 : 0) : delta;
 }
-
 __inline int max_sub(size_t* result, size_t* a, size_t* b, int a_length, int b_length) {
 	int abits = _msb_u64(a, a_length);
 	int bbits = _msb_u64(b, b_length);
