@@ -139,23 +139,6 @@ __inline size_t set_bits(size_t* a, int maxpos, int bp, size_t value, int length
 	}
 	return value;
 }
-__inline size_t min(size_t a, size_t b) {
-	return a <= b ? a : b;
-}
-__inline size_t max(size_t a, size_t b) {
-	return a >= b ? a : b;
-}
-__inline int clearbits(size_t* dst, int length) {
-	if (dst != 0 && length >= 0) {
-		int ps = length >> 6;
-		int rs = length % 64;
-		memset(dst, 0, ps * sizeof(size_t));
-		if (rs != 0)
-			dst[ps] &= ~(all_ones << rs);
-		return length;
-	}
-	return 0;
-}
 
 __inline int copybits(void* dst, void* src, int length) {
 	if (dst != 0 && src != 0) {
@@ -211,21 +194,18 @@ __inline int sub_core_shift_bits(size_t* result, size_t* a, size_t* b, int rbits
 	return delta == 0 ? (any ? -1 : 0) : delta;
 }
 
-//br: result 
 __inline int max_sub(size_t* result, size_t* a, size_t* b, int a_length, int b_length) {
 	int abits = _msb_u64(a, a_length);
 	int bbits = _msb_u64(b, b_length);
 	int delta = abits - bbits;
-	if (delta < 0) {
-		return delta;
-	}
-	else { //delta <= 0
-		return sub_core_shift_bits(result, a, b, (a_length << 6), abits, bbits);
-	}
+	return delta < 0
+		? -1
+		: sub_core_shift_bits(result, a, b, (a_length << 6), abits, bbits)
+		;
 }
 int fast_mod(size_t* result, size_t* minuend, size_t* subtrahend, int minuend_length, int subtrahend_length) {
 	int cmp = 1;
-	//memcpy(result, minuend, (size_t)minuend_length << 3);
+	memset(result, 0, (size_t)minuend_length << 3);
 	while (true)
 	{
 		cmp = max_sub(result, minuend, subtrahend, minuend_length, subtrahend_length);
@@ -283,7 +263,7 @@ int fastmod_sample() {
 
 	int r = fast_mod(result, a, b, a_length, b_length);
 	if (r == 0) {
-		printf("a %% b =\n");
+		printf("a %% b = 0\n");
 		printbin(result, a_length);
 		printf("\n");
 	}
@@ -291,7 +271,7 @@ int fastmod_sample() {
 		printf("a %% b = ");
 		printbin(result, a_length);
 		printf("\n    b = ");
-		for (int i = 0; i < b_length<<6; i++) printf("0");
+		for (int i = 0; i < b_length << 6; i++) printf("0");
 		printbin(b, b_length);
 		printf("\n");
 	}
