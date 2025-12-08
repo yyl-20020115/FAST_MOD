@@ -54,32 +54,6 @@ __inline int _msb_u64(size_t* n, int length) {
 	return p < 0 ? 0 : ((p) << 6) + (63 - (count % 64));
 }
 
-__inline void sub_core(size_t* result, size_t* a, size_t* b, int nbits) {
-	//a-b
-	size_t borrow = all_zeros;
-	for (int i = 0; i < nbits; i++) {
-		if (borrow != all_zeros) {
-			if (result[i] == all_zeros) {
-				//keep borrow and set all1s
-				result[i] = all_ones;
-			}
-			else {
-				result[i] -= borrow;
-				borrow = all_zeros;
-			}
-		}
-		if (a[i] >= b[i]) {
-			result[i] = a[i] - b[i];
-			borrow = all_zeros;
-		}
-		else { //borrow
-			result[i] = (all_ones - a[i]) + b[i];
-			borrow = all_zeros;
-			++borrow;
-		}
-	}
-
-}
 __inline size_t get_bits(size_t* a, int maxpos, int basepos, int length = 64) {
 	if (basepos > maxpos)
 		basepos = 64 - basepos;
@@ -189,27 +163,24 @@ __inline int sub_core_shift_bits(size_t* result, size_t* a, size_t* b, int rbits
 	}
 	return delta == 0 ? (any ? -1 : 0) : delta;
 }
-__inline int max_sub(size_t* result, size_t* a, size_t* b, int a_length, int b_length) {
-	int abits = _msb_u64(a, a_length);
-	int bbits = _msb_u64(b, b_length);
-	int delta = abits - bbits;
-	return delta < 0
-		? -1
-		: sub_core_shift_bits(result, a, b, (a_length << 6), abits, bbits)
-		;
-}
-int fast_mod(size_t* result, size_t* minuend, size_t* subtrahend, int minuend_length, int subtrahend_length) {
+__inline int fast_mod(size_t* result, size_t* minuend, size_t* subtrahend, int minuend_length, int subtrahend_length) {
 	int cmp = 1;
 	memset(result, 0, (size_t)minuend_length << 3);
 	while (true)
 	{
-		cmp = max_sub(result, minuend, subtrahend, minuend_length, subtrahend_length);
+		int abits = _msb_u64(minuend, minuend_length);
+		int bbits = _msb_u64(subtrahend, subtrahend_length);
+		cmp = abits < bbits
+			? -1
+			: sub_core_shift_bits(result, minuend, subtrahend, (minuend_length << 6), abits, bbits)
+			;
 		if (cmp <= 0) break;
 		memcpy(minuend, result, (size_t)minuend_length << 3);
 	}
 
 	return cmp;
 }
+
 int subrange_sample() {
 	const int a_length = 192 / 64; //32
 	size_t result[a_length] = { 0 };
@@ -272,6 +243,7 @@ int fastmod_sample() {
 	}
 	return 0;
 }
+
 int main()
 {
 	//subrange_sample();
